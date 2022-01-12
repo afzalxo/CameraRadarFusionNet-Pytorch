@@ -70,7 +70,7 @@ def create_generators(cfg, backbone):
 
   if 'nuscenes' in cfg.data_set:
     # import here to prevent unnecessary dependency on nuscenes
-    from crfnet.data_processing.generator.nuscenes_generator import NuscenesGenerator
+    from data_processing.generator.nuscenes_generator import NuscenesGenerator
     from nuscenes.nuscenes import NuScenes
 
     if 'mini' in cfg.data_set:
@@ -141,6 +141,8 @@ def create_generators(cfg, backbone):
     return train_generator, validation_generator, test_generator, test_night_generator, test_rain_generator
   else:
     raise ValueError('Invalid data type received: {}'.format(cfg.data_set))
+
+import numpy as np
 
 def guess_shapes(image_shape, pyramid_levels):
     """Guess shapes based on pyramid levels.

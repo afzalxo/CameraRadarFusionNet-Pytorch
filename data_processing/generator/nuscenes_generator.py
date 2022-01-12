@@ -41,10 +41,10 @@ from nuscenes.utils.data_classes import RadarPointCloud, Box
 from nuscenes.utils.geometry_utils import box_in_image, view_points, BoxVisibility, points_in_box
 
 from .generator import Generator
-from ...utils import radar
-from ...utils.nuscenes_helper import get_sensor_sample_data, calc_mask
-from ...data_processing.fusion.fusion_projection_lines import create_imagep_visualization
-from ...utils.noise_img import noisy
+from utils import radar
+from utils.nuscenes_helper import get_sensor_sample_data, calc_mask
+from data_processing.fusion.fusion_projection_lines import create_imagep_visualization
+from utils.noise_img import noisy
 
 class NuscenesGenerator(Generator):
     """ Generate data for a nuScenes dataset.
@@ -130,7 +130,7 @@ class NuscenesGenerator(Generator):
         self.radar_array_creation = None
         if self._is_image_plus_enabled() or self.camera_dropout > 0.0:
             # Installing vizdom is required
-            from crfnet.data_processing.fusion.fusion_projection_lines import imageplus_creation, create_spatial_point_array
+            from data_processing.fusion.fusion_projection_lines import imageplus_creation, create_spatial_point_array
 
             self.image_plus_creation = imageplus_creation
             self.radar_array_creation = create_spatial_point_array

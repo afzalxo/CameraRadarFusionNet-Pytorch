@@ -71,7 +71,6 @@ class Vggmax(nn.Module):
         radar_input = input[:,3:,:,:]
         x = self.block1(input)
         y = self.rad_block1_pool(radar_input)
-        print(x.size(), y.size())
         x = torch.cat((x, y), axis=1)
         x = self.block2(x)
         y = self.rad_block2_pool(y)

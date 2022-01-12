@@ -1,4 +1,4 @@
-### Stripped down implementation of CameraRadarFusionNet in Pytorch.
+### WIP: Stripped down implementation of CameraRadarFusionNet in Pytorch.
 
 [Link](https://github.com/TUMFTM/CameraRadarFusionNet) to original work
 

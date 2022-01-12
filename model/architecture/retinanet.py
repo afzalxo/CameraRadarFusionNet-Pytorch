@@ -54,7 +54,6 @@ class Retinanet(nn.Module):
         p5 = self.p5_conv2(p5)
 
         p4 = self.p4_conv1(concat_features[-2])
-        print(p4.size(), p5_upsampled.size())
         p4 += p5_upsampled
         p4_upsampled = self.p4_upsample(p4)
         p4 = self.p4_conv2(p4)
@@ -77,8 +76,6 @@ class Retinanet(nn.Module):
         p3 = torch.cat((p3, r3), axis=1) 
         p4 = torch.cat((p4, r4), axis=1) 
         p5 = torch.cat((p5, r5), axis=1) 
-        print(p3.size(), p4.size(), p5.size(), p6.size(), p7.size())
-        print(r3.size(), r4.size(), r5.size(), r6.size(), r7.size())
         p6 = torch.cat((p6, r6), axis=1) 
         p7 = torch.cat((p7, r7), axis=1) 
 
@@ -102,11 +99,11 @@ class Retinanet(nn.Module):
     def forward(self, input):
         image_features, radar_features = self.backbone(input)
         pyramid_features = self.create_pyramid_features(concat_features=image_features, radar_layers=radar_features) 
-        print('--=='*20)
-        for feature in pyramid_features:
+        #print('--=='*20)
+        #for feature in pyramid_features:
             #print(feature.size())
-            res = self.run_regression_submodel(feature, 4)
-            print(res.size())
+            #res = self.run_regression_submodel(feature, 4)
+            #print(res.size())
         regression_out = torch.cat([self.run_regression_submodel(feature, 4) for feature in pyramid_features], dim=0)
         classification_out = torch.cat([self.run_classification_submodel(feature, self.num_classes) for feature in pyramid_features], dim=0)
         return [regression_out, classification_out]
