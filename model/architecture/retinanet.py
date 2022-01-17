@@ -5,7 +5,7 @@ from torchvision.transforms import InterpolationMode
 from model.architecture.vgg import Vggmax
 
 class Retinanet(nn.Module):
-    def __init__(self, feature_size, num_values_regression, num_anchors, num_classes, image_size=(360, 640)):
+    def __init__(self, backbone, num_anchors, num_classes, num_values_regression=4, feature_size=254, image_size=(360, 640)):
         super(Retinanet, self).__init__()
         self.feature_size = feature_size
         self.num_values_regression = num_values_regression
@@ -15,11 +15,11 @@ class Retinanet(nn.Module):
         self.classification_feature_size = 256
         self.num_classes = num_classes
 
-        self.backbone = Vggmax()
+        self.backbone = backbone
         __feature_size = self.backbone._feature_sizes()
         self.p5_conv1 = nn.Conv2d(in_channels=__feature_size[-1], out_channels=self.feature_size, kernel_size=1, stride=1, padding=0)
         self.p5_conv2 = nn.Conv2d(in_channels=self.feature_size, out_channels=self.feature_size, kernel_size=3, stride=1, padding=1)
-        self.p5_upsample = transforms.Resize((int(image_size[0]/16), int(image_size[1]/16)), interpolation=InterpolationMode.NEAREST)
+        self.p5_upsample = transforms.Resize((int(image_size[0]/16+1), int(image_size[1]/16)), interpolation=InterpolationMode.NEAREST)
 
         self.p4_conv1 = nn.Conv2d(in_channels=__feature_size[-2], out_channels=self.feature_size, kernel_size=1, stride=1, padding=0)
         self.p4_conv2 = nn.Conv2d(in_channels=self.feature_size, out_channels=self.feature_size, kernel_size=3, stride=1, padding=1)
@@ -85,15 +85,19 @@ class Retinanet(nn.Module):
         for i in range(len(self.regression_ops)):
             features = self.regression_ops[i](features)
         features = torch.permute(features, (0, 2, 3, 1))
-        outputs = torch.reshape(features, (-1, num_values))
+        outputs = torch.reshape(features, (features.shape[0], -1, num_values))
+        #print('Regression Outputs Size:')
+        #print(num_values, outputs.size())
         return outputs
 
     def run_classification_submodel(self, features, num_classes):
         for i in range(len(self.classification_ops)):
             features = self.classification_ops[i](features)
         features = torch.permute(features, (0, 2, 3, 1))
-        outputs = torch.reshape(features, (-1, num_classes))
+        outputs = torch.reshape(features, (features.shape[0], -1, num_classes))
         outputs = nn.Sigmoid()(outputs)
+        #print('Classification Outputs Size:')
+        #print(num_classes, outputs.size())
         return outputs
 
     def forward(self, input):
@@ -104,7 +108,8 @@ class Retinanet(nn.Module):
             #print(feature.size())
             #res = self.run_regression_submodel(feature, 4)
             #print(res.size())
-        regression_out = torch.cat([self.run_regression_submodel(feature, 4) for feature in pyramid_features], dim=0)
-        classification_out = torch.cat([self.run_classification_submodel(feature, self.num_classes) for feature in pyramid_features], dim=0)
+        regression_out = torch.cat([self.run_regression_submodel(feature, 4) for feature in pyramid_features], dim=1)
+        classification_out = torch.cat([self.run_classification_submodel(feature, self.num_classes) for feature in pyramid_features], dim=1)
+        #self.focal_loss(regression_out, classification_out, anchors, annotations)
         return [regression_out, classification_out]
         

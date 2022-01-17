@@ -37,7 +37,7 @@ class Vggmax(nn.Module):
             ('block4_conv2relu', nn.ReLU(inplace=False)),
             ('block4_conv3', nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, stride=1, padding=1)),
             ('block4_conv3relu', nn.ReLU(inplace=False)),
-            ('block4_mp', nn.MaxPool2d(kernel_size=2, stride=2, padding=0))
+            ('block4_mp', nn.MaxPool2d(kernel_size=2, stride=2, padding=(1,0)))
         ]))
         self.block5 = nn.Sequential(OrderedDict([
             ('block5_conv1', nn.Conv2d(in_channels=514, out_channels=512, kernel_size=3, stride=1, padding=1)),
@@ -46,15 +46,15 @@ class Vggmax(nn.Module):
             ('block5_conv2relu', nn.ReLU(inplace=False)),
             ('block5_conv3', nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, stride=1, padding=1)),
             ('block5_conv3relu', nn.ReLU(inplace=False)),
-            ('block5_mp', nn.MaxPool2d(kernel_size=2, stride=2, padding=0))
+            ('block5_mp', nn.MaxPool2d(kernel_size=2, stride=2, padding=(1,0)))
         ]))
 
         self.rad_block1_pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
         self.rad_block2_pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
         self.rad_block3_pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-        self.rad_block4_pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-        self.rad_block5_pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-        self.rad_block6_pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=(1,0))
+        self.rad_block4_pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=(1,0))
+        self.rad_block5_pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=(1,0))
+        self.rad_block6_pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
         self.rad_block7_pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
         self.global_avg_pool = nn.AdaptiveAvgPool2d((1,1)) 
 

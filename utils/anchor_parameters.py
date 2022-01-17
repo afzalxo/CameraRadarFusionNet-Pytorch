@@ -17,7 +17,7 @@ Original Source: https://github.com/fizyr/keras-retinanet
 """
 
 import numpy as np
-from keras.backend import floatx
+#from keras.backend import floatx
 #from tensorflow.keras.backend import floatx
 
 
@@ -47,13 +47,13 @@ The default anchor parameters.
 AnchorParameters.default = AnchorParameters(
     sizes   = [32, 64, 128, 256, 512],
     strides = [8, 16, 32, 64, 128],
-    ratios  = np.array([0.5, 1, 2], floatx()),
-    scales  = np.array([2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)], floatx()),
+    ratios  = np.array([0.5, 1, 2], dtype=np.float32),
+    scales  = np.array([2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)], dtype=np.float32),
 )
 
 AnchorParameters.small = AnchorParameters(
     sizes   = [16, 32, 64, 128, 256],
     strides = [8, 16, 32, 64, 128],
-    ratios  = np.array([0.5, 1, 2], floatx()),
-    scales  = np.array([2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)], floatx()),
+    ratios  = np.array([0.5, 1, 2], dtype=np.float32),
+    scales  = np.array([2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)], dtype=np.float32),
 )
