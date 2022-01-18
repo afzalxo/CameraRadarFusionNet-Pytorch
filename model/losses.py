@@ -1,23 +1,42 @@
 import numpy as np
+import gc
 import torch
 import torch.nn as nn
 
+def getfree(sr):
+    r = torch.cuda.memory_reserved(0)
+    a = torch.cuda.memory_allocated(0)
+    f = (r-a)/(1024**2)  # free inside reserved
+    print((sr + ' free: {}').format(f))
+
 def calc_iou(a, b):
+    #a = a.cuda()
+    #b = torch.tensor(b).cuda()
     area = (b[:, 2] - b[:, 0]) * (b[:, 3] - b[:, 1])
 
     iw = torch.min(torch.unsqueeze(a[:, 2], dim=1), b[:, 2]) - torch.max(torch.unsqueeze(a[:, 0], 1), b[:, 0])
     ih = torch.min(torch.unsqueeze(a[:, 3], dim=1), b[:, 3]) - torch.max(torch.unsqueeze(a[:, 1], 1), b[:, 1])
 
+    getfree('after ih iw')
     iw = torch.clamp(iw, min=0)
     ih = torch.clamp(ih, min=0)
 
-    ua = torch.unsqueeze((a[:, 2] - a[:, 0]) * (a[:, 3] - a[:, 1]), dim=1) + area - iw * ih
+    a_area = (a[:,2] - a[:,0]) * (a[:,3] - a[:,1])
+
+    getfree('after a_area')
+    print(a_area.shape)
+    ua = torch.unsqueeze(a_area, dim=1) + area - iw * ih
+    getfree('after unsqueeze')
+    print(ua.shape)
 
     ua = torch.clamp(ua, min=1e-8)
 
     intersection = iw * ih
 
     IoU = intersection / ua
+    
+    del a, b, ua, intersection, iw, ih, area
+    gc.collect()
 
     return IoU
 
@@ -30,9 +49,10 @@ class FocalLoss(nn.Module):
         batch_size = classifications.shape[0]
         classification_losses = []
         regression_losses = []
-        regressions = regressions.cuda()
-        classifications = classifications.cuda()
-        annotations = torch.tensor(annotations).cuda()
+        #regressions = regressions.cuda()
+        #classifications = classifications.cuda()
+        #annotations = annotations.cuda()
+        #annotations = torch.tensor(annotations).cuda()
         #print('Class: {}, Regress: {}, Anchors: {}, Annotations type: {}'.format(type(classifications), type(regressions), type(anchors), type(annotations)))
 
         anchor = anchors[0, :, :]
@@ -84,7 +104,12 @@ class FocalLoss(nn.Module):
 
                 continue
 
+            #bbox_annotation = torch.tensor(bbox_annotation)
+            #anchors = anchors.cpu()
+            #print(torch.cuda.memory_summary())
+            getfree('before IoU')
             IoU = calc_iou(anchors[0, :, :], bbox_annotation[:, :4]) # num_anchors x num_annotations
+            getfree('after IoU')
             #print('IoU shape: {}'.format(IoU.shape))
 
             IoU_max, IoU_argmax = torch.max(IoU, dim=1) # num_anchors x 1
@@ -94,9 +119,9 @@ class FocalLoss(nn.Module):
 
             # compute the loss for classification
             targets = torch.ones(classification.shape) * -1
-
             if torch.cuda.is_available():
                 targets = targets.cuda()
+            print('alloc5'*5)
             #print('Targets and IoU_max shape')
             #print(targets.shape, IoU_max.shape)
 
@@ -106,7 +131,7 @@ class FocalLoss(nn.Module):
 
             num_positive_anchors = positive_indices.sum()
 
-            assigned_annotations = bbox_annotation[IoU_argmax, :]
+            assigned_annotations = bbox_annotation[IoU_argmax.cpu(), :]
 
             targets[positive_indices, :] = 0
             targets[positive_indices, assigned_annotations[positive_indices, 4].long()] = 1
@@ -115,6 +140,7 @@ class FocalLoss(nn.Module):
                 alpha_factor = torch.ones(targets.shape).cuda() * alpha
             else:
                 alpha_factor = torch.ones(targets.shape) * alpha
+            print('alloc6'*5)
 
             alpha_factor = torch.where(torch.eq(targets, 1.), alpha_factor, 1. - alpha_factor)
             focal_weight = torch.where(torch.eq(targets, 1.), 1. - classification, classification)
@@ -129,9 +155,10 @@ class FocalLoss(nn.Module):
                 cls_loss = torch.where(torch.ne(targets, -1.0), cls_loss, torch.zeros(cls_loss.shape).cuda())
             else:
                 cls_loss = torch.where(torch.ne(targets, -1.0), cls_loss, torch.zeros(cls_loss.shape))
+            print('alloc7'*5)
 
             classification_losses.append(cls_loss.sum()/torch.clamp(num_positive_anchors.float(), min=1.0))
-            #classification_losses.append(torch.tensor([1], dtype=float)) #TODO: Remove
+            #classification_losses.append(torch.tensor(0, dtype=float)) #TODO: Remove
 
             # compute the loss for regression
 
@@ -174,11 +201,15 @@ class FocalLoss(nn.Module):
                     regression_diff - 0.5 / 9.0
                 )
                 regression_losses.append(regression_loss.mean())
+                #regression_losses.append(torch.tensor(0, dtype=float))
             else:
                 if torch.cuda.is_available():
                     regression_losses.append(torch.tensor(0).float().cuda())
                 else:
                     regression_losses.append(torch.tensor(0).float())
+        
+        del regressions, classifications, annotations, IoU
+        gc.collect()
 
         return torch.stack(classification_losses).mean(dim=0, keepdim=True), torch.stack(regression_losses).mean(dim=0, keepdim=True)
 

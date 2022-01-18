@@ -32,7 +32,7 @@ class Retinanet(nn.Module):
         self.p7_conv = nn.Conv2d(in_channels=self.feature_size, out_channels=self.feature_size, kernel_size=3, stride=2, padding=1)
 
         ### Regression ops here
-        self.regression_ops = []
+        self.regression_ops = nn.ModuleList()
         inp_channels = self.pyramid_feature_size
         for i in range(4):
             self.regression_ops += [nn.Conv2d(in_channels=inp_channels, out_channels=self.regression_feature_size, kernel_size=3, stride=1, padding=1)]  #TODO: Kernel initializer to normal pending
@@ -41,12 +41,14 @@ class Retinanet(nn.Module):
         self.regression_ops += [nn.Conv2d(in_channels=self.regression_feature_size, out_channels=self.num_anchors*self.num_values_regression, kernel_size=3, stride=1, padding=1)] #TODO: Kernel initializer to normal pending
 
         ### Classification ops here
-        self.classification_ops = []
+        self.classification_ops = nn.ModuleList()
         for i in range(4):
             self.classification_ops += [nn.Conv2d(in_channels=inp_channels, out_channels=self.classification_feature_size, kernel_size=3, stride=1, padding=1)]
             inp_channels = self.classification_feature_size
             self.classification_ops += [nn.ReLU(inplace=False)]
         self.classification_ops += [nn.Conv2d(in_channels=self.classification_feature_size, out_channels=self.num_classes*self.num_anchors, kernel_size=3, stride=1, padding=1)]
+
+        self.out_sig = nn.Sigmoid()
 
     def create_pyramid_features(self, concat_features, radar_layers=None):
         p5 = self.p5_conv1(concat_features[-1])
@@ -95,7 +97,7 @@ class Retinanet(nn.Module):
             features = self.classification_ops[i](features)
         features = torch.permute(features, (0, 2, 3, 1))
         outputs = torch.reshape(features, (features.shape[0], -1, num_classes))
-        outputs = nn.Sigmoid()(outputs)
+        outputs = self.out_sig(outputs)
         #print('Classification Outputs Size:')
         #print(num_classes, outputs.size())
         return outputs
