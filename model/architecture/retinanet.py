@@ -3,6 +3,9 @@ import torch.nn as nn
 from torchvision import transforms
 from torchvision.transforms import InterpolationMode
 from model.architecture.vgg import Vggmax
+from model import losses_torch
+from model.anchors import Anchors
+from utils.bbox_utils import BBoxTransform, ClipBoxes
 
 class Retinanet(nn.Module):
     def __init__(self, backbone, num_anchors, num_classes, num_values_regression=4, feature_size=254, image_size=(360, 640)):
@@ -49,6 +52,12 @@ class Retinanet(nn.Module):
         self.classification_ops += [nn.Conv2d(in_channels=self.classification_feature_size, out_channels=self.num_classes*self.num_anchors, kernel_size=3, stride=1, padding=1)]
 
         self.out_sig = nn.Sigmoid()
+
+        self.anchors = Anchors()
+        self.focalloss = losses_torch.focal()
+        self.smoothl1 = losses_torch.smooth_l1()
+        self.bboxtransform = BBoxTransform()
+        self.clipboxes = ClipBoxes()
 
     def create_pyramid_features(self, concat_features, radar_layers=None):
         p5 = self.p5_conv1(concat_features[-1])
@@ -103,6 +112,8 @@ class Retinanet(nn.Module):
         return outputs
 
     def forward(self, input):
+        if self.training:
+            input, annotations = input
         image_features, radar_features = self.backbone(input)
         pyramid_features = self.create_pyramid_features(concat_features=image_features, radar_layers=radar_features) 
         #print('--=='*20)
@@ -112,6 +123,16 @@ class Retinanet(nn.Module):
             #print(res.size())
         regression_out = torch.cat([self.run_regression_submodel(feature, 4) for feature in pyramid_features], dim=1)
         classification_out = torch.cat([self.run_classification_submodel(feature, self.num_classes) for feature in pyramid_features], dim=1)
-        #self.focal_loss(regression_out, classification_out, anchors, annotations)
+
+        anchors = self.anchors(input)
+        
+        if self.training:
+            fl = self.focalloss(classification_out, regression_out, anchors, annotations)
+            sl = self.smoothl1()
+            return fl, sl
+        else:
+            transformed_anchors = self.bboxtransform(anchors, regression_out)
+            transformed_anchors = self.clipboxes(transformed_anchors, input)
+
         return [regression_out, classification_out]
         

@@ -1,17 +1,30 @@
+import os 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 import argparse
 import numpy as np
 import collections
 import gc
+import warnings
+
+warnings.filterwarnings('ignore')
 
 import torch
 import torch.optim as optim
 import torch.nn as nn
+from torch.autograd import Variable
+
+from tensorflow import keras
+import tensorflow as tf
 
 from model.architecture.retinanet import Retinanet
 from model.architecture.vgg import Vggmax
 from utils.config import get_config
 from data_processing.generator.crf_main_generator import create_generators
-from model.losses import FocalLoss
+#from model.losses import FocalLoss
+#from model.losses_keras import smooth_l1
+from model import losses_keras
+from model.losses_torch import smooth_l1
+from model.losses_torch import focal
 from model.anchors import Anchors
 
 parser = argparse.ArgumentParser()
@@ -39,11 +52,11 @@ def main():
     loss_hist = collections.deque(maxlen=500)
 
     print('Num training images: {}'.format(len(train_generator)))
-    sample_inputs, _ = train_generator[0]
-    b = torch.permute(torch.tensor(sample_inputs), (0, 3, 1, 2))
-    anchs = _anchors(b)
+    #sample_inputs, _ = train_generator[0]
+    #b = torch.permute(torch.tensor(sample_inputs), (0, 3, 1, 2))
+    #anchs = _anchors(b)
 
-    loss_func = FocalLoss()
+    #loss_func = FocalLoss()
 
     def getfree(sr):
         r = torch.cuda.memory_reserved(0)
@@ -58,41 +71,59 @@ def main():
         for i in range(len(train_generator)):
             #try:
             img, targets = train_generator[i]
-            getfree('after train_gen')
             optimizer.zero_grad()
 
-            #img = torch.tensor(img).cuda()
             img = torch.permute(torch.tensor(img).cuda().float(), (0, 3, 1, 2))
-            getfree('after permute')
-            reg_out, clas_out = model(img)
-            getfree('after model')
-
-            #targets_reg = torch.tensor(targets[0]).cuda()
             targets_reg = torch.tensor(targets[0]).cuda().float()
+            #print('Img size: {}, Targets size: {}'.format(img.size(), targets_reg.size()))
+            reg_out, clas_out = model(img)
+
+            targets_reg = torch.tensor(targets[0])
+            pred_reg = torch.tensor(reg_out.detach().cpu().numpy())
+            targets_clas = torch.tensor(targets[1])
+            pred_clas = torch.tensor(clas_out.detach().cpu().numpy())
             
-            clas_loss, reg_loss = loss_func(clas_out, reg_out, anchs, targets_reg)
-            #clas_loss, reg_loss = torch.tensor([0], dtype=float), torch.tensor([0], dtype=float)
+            clas_loss = focal()(targets_clas, pred_clas)
+            reg_loss = smooth_l1()(targets_reg, pred_reg)
+            #print('=Torch= Classification Loss: {}, Regression Loss: {}, Total: {}'.format(clas_loss.mean(), reg_loss.mean(), clas_loss.mean()+reg_loss.mean()))
+
+            '''
+            cls_bk, reg_bk = clas_loss, reg_loss
+            targets_reg = tf.convert_to_tensor(targets[0])
+            pred_reg = tf.convert_to_tensor(reg_out.detach().cpu().numpy())
+            targets_clas = tf.convert_to_tensor(targets[1])
+            pred_clas = tf.convert_to_tensor(clas_out.detach().cpu().numpy())
+            clas_loss = losses_keras.focal()(targets_clas, pred_clas)
+            reg_loss = losses_keras.smooth_l1()(targets_reg, pred_reg)
+            with tf.Session() as sess:
+                #print('--=='*20)
+                clas_loss = clas_loss.eval()
+                reg_loss = reg_loss.eval()
+            #    print('###'*20)
+            #    print(reg_loss.eval())
+            print('=TF= Classification Loss: {}, Regression Loss: {}, Total: {}'.format(clas_loss.mean(), reg_loss.mean(), clas_loss.mean()+reg_loss.mean()))
+            clas_loss, reg_loss = cls_bk, reg_bk
+            '''
+            #exit(0)
             clas_loss = clas_loss.mean()
             reg_loss = reg_loss.mean()
             loss = clas_loss + reg_loss
-
+            loss = Variable(loss, requires_grad = True)
             if bool(loss == 0):
                 continue
 
-            getfree('after loss')
             loss.backward()
 
-            getfree('after firstiter')
             nn.utils.clip_grad_norm_(model.parameters(), 0.1)
 
             optimizer.step()
 
-            #loss_hist.append(float(loss.detach()))
-            #epoch_loss.append(float(loss.detach()))
+            loss_hist.append(float(loss.detach()))
+            epoch_loss.append(float(loss.detach()))
 
             print('Epoch: {} | Iteration: {} | Classification Loss: {:1.5f} | Regression Loss: {:1.5f} | Running Loss: {:1.5f}'.format(epoch, i, float(clas_loss), float(reg_loss), np.mean(loss_hist)))
 
-            del img, targets, reg_out, clas_out, clas_loss, reg_loss, loss, targets_reg
+            del img, targets, clas_loss, reg_loss, loss, targets_reg
             gc.collect()
 
             #except Exception as e:

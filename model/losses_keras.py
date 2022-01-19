@@ -55,15 +55,16 @@ def focal(alpha=0.25, gamma=2.0):
         alpha_factor = backend.where(keras.backend.equal(labels, 1), alpha_factor, 1 - alpha_factor)
         focal_weight = backend.where(keras.backend.equal(labels, 1), 1 - classification, classification)
         focal_weight = alpha_factor * focal_weight ** gamma
-
+        #port = labels
         cls_loss = focal_weight * keras.backend.binary_crossentropy(labels, classification)
+        #port = keras.backend.sum(keras.backend.binary_crossentropy(labels, classification))
 
         # compute the normalizer: the number of positive anchors
         normalizer = backend.where(keras.backend.equal(anchor_state, 1))
         normalizer = keras.backend.cast(keras.backend.shape(normalizer)[0], keras.backend.floatx())
         normalizer = keras.backend.maximum(keras.backend.cast_to_floatx(1.0), normalizer)
 
-        return keras.backend.sum(cls_loss) / normalizer
+        return keras.backend.sum(cls_loss) / normalizer#, port
 
     return _focal
 
@@ -89,8 +90,8 @@ def smooth_l1(sigma=3.0, alpha=1.0):
         Returns
             The smooth L1 loss of y_pred w.r.t. y_true.
         """
-        y_true = K.constant(y_true)
-        y_pred = K.constant(y_pred)
+        #y_true = K.constant(y_true)
+        #y_pred = K.constant(y_pred)
         # separate target and state
         regression        = y_pred
         regression_target = y_true[:, :, :-1]
