@@ -6,12 +6,12 @@ def smooth_l1(sigma=3.0, alpha=1.0):
 
     def _smooth_l1(y_true, y_pred):
         # separate target and state
-        regression        = y_pred
+        regression        = y_pred#[0, :, :]
         regression_target = y_true[:, :, :-1]
         anchor_state      = y_true[:, :, -1]
 
-        regression = regression[y_true[:, :, 4]==1]
-        regression_target = regression_target[y_true[:, :, 4] == 1]
+        regression = regression[y_true[:, :, -1] != -1]
+        regression_target = regression_target[y_true[:, :, -1] != -1]
         
         regression_diff = torch.abs(regression - regression_target)
         regression_loss = torch.where(
@@ -32,8 +32,8 @@ def focal(alpha=0.25, gamma=2.0):
         labels                = y_true[:, :, :-1]
         anchor_state          = y_true[:, :, -1]
 
-        classification  = classification[y_true[:, :, 4] != -1]
-        labels = labels[y_true[:, :, 4] != -1]
+        classification  = classification[y_true[:, :, -1] != -1]
+        labels = labels[y_true[:, :, -1] != -1]
 
         alpha_factor = torch.ones_like(labels) * alpha
         alpha_factor = torch.where(torch.eq(labels, 1), alpha_factor, 1-alpha_factor)

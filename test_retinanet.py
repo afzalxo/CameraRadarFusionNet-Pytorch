@@ -76,6 +76,7 @@ def main():
             img = torch.permute(torch.tensor(img).cuda().float(), (0, 3, 1, 2))
             targets_reg = torch.tensor(targets[0]).cuda().float()
             #print('Img size: {}, Targets size: {}'.format(img.size(), targets_reg.size()))
+            model.training = False
             reg_out, clas_out = model(img)
 
             targets_reg = torch.tensor(targets[0])

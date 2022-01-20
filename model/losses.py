@@ -10,24 +10,17 @@ def getfree(sr):
     print((sr + ' free: {}').format(f))
 
 def calc_iou(a, b):
-    #a = a.cuda()
-    #b = torch.tensor(b).cuda()
     area = (b[:, 2] - b[:, 0]) * (b[:, 3] - b[:, 1])
 
     iw = torch.min(torch.unsqueeze(a[:, 2], dim=1), b[:, 2]) - torch.max(torch.unsqueeze(a[:, 0], 1), b[:, 0])
     ih = torch.min(torch.unsqueeze(a[:, 3], dim=1), b[:, 3]) - torch.max(torch.unsqueeze(a[:, 1], 1), b[:, 1])
 
-    getfree('after ih iw')
     iw = torch.clamp(iw, min=0)
     ih = torch.clamp(ih, min=0)
 
     a_area = (a[:,2] - a[:,0]) * (a[:,3] - a[:,1])
 
-    getfree('after a_area')
-    print(a_area.shape)
     ua = torch.unsqueeze(a_area, dim=1) + area - iw * ih
-    getfree('after unsqueeze')
-    print(ua.shape)
 
     ua = torch.clamp(ua, min=1e-8)
 
@@ -35,8 +28,8 @@ def calc_iou(a, b):
 
     IoU = intersection / ua
     
-    del a, b, ua, intersection, iw, ih, area
-    gc.collect()
+    #del a, b, ua, intersection, iw, ih, area
+    #gc.collect()
 
     return IoU
 
@@ -66,9 +59,16 @@ class FocalLoss(nn.Module):
 
             classification = classifications[j, :, :]
             regression = regressions[j, :, :]
+            #print(annotations.shape, regression.shape, anchors.shape)
 
             bbox_annotation = annotations[j, :, :]
-            bbox_annotation = bbox_annotation[bbox_annotation[:, 4] != -1] # Keep all rows except the ones where the state of anchor is ignore. Anchor states = (ignore, negative, positive) (-1, 0, 1)
+            bbox_annotation = bbox_annotation[bbox_annotation[:, -1] != -1] # Keep all rows except the ones where the state of anchor is ignore. Anchor states = (ignore, negative, positive) (-1, 0, 1)
+            #print(annotations[:,:,4].shape)
+            #regression = regression[annotations[:, :, -1] != -1]
+            #classification = classification[annotations[:, :, -1] != -1]
+            #print(regression.shape, classification.shape)
+            #exit(0)
+
 
             classification = torch.clamp(classification, 1e-4, 1.0 - 1e-4)
             #print('bbox_annotation shape')
@@ -104,13 +104,7 @@ class FocalLoss(nn.Module):
 
                 continue
 
-            #bbox_annotation = torch.tensor(bbox_annotation)
-            #anchors = anchors.cpu()
-            #print(torch.cuda.memory_summary())
-            getfree('before IoU')
             IoU = calc_iou(anchors[0, :, :], bbox_annotation[:, :4]) # num_anchors x num_annotations
-            getfree('after IoU')
-            #print('IoU shape: {}'.format(IoU.shape))
 
             IoU_max, IoU_argmax = torch.max(IoU, dim=1) # num_anchors x 1
 
@@ -121,9 +115,6 @@ class FocalLoss(nn.Module):
             targets = torch.ones(classification.shape) * -1
             if torch.cuda.is_available():
                 targets = targets.cuda()
-            print('alloc5'*5)
-            #print('Targets and IoU_max shape')
-            #print(targets.shape, IoU_max.shape)
 
             targets[torch.lt(IoU_max, 0.4), :] = 0
 
@@ -131,7 +122,7 @@ class FocalLoss(nn.Module):
 
             num_positive_anchors = positive_indices.sum()
 
-            assigned_annotations = bbox_annotation[IoU_argmax.cpu(), :]
+            assigned_annotations = bbox_annotation[IoU_argmax, :]
 
             targets[positive_indices, :] = 0
             targets[positive_indices, assigned_annotations[positive_indices, 4].long()] = 1
@@ -140,7 +131,6 @@ class FocalLoss(nn.Module):
                 alpha_factor = torch.ones(targets.shape).cuda() * alpha
             else:
                 alpha_factor = torch.ones(targets.shape) * alpha
-            print('alloc6'*5)
 
             alpha_factor = torch.where(torch.eq(targets, 1.), alpha_factor, 1. - alpha_factor)
             focal_weight = torch.where(torch.eq(targets, 1.), 1. - classification, classification)
@@ -155,11 +145,7 @@ class FocalLoss(nn.Module):
                 cls_loss = torch.where(torch.ne(targets, -1.0), cls_loss, torch.zeros(cls_loss.shape).cuda())
             else:
                 cls_loss = torch.where(torch.ne(targets, -1.0), cls_loss, torch.zeros(cls_loss.shape))
-            print('alloc7'*5)
-
             classification_losses.append(cls_loss.sum()/torch.clamp(num_positive_anchors.float(), min=1.0))
-            #classification_losses.append(torch.tensor(0, dtype=float)) #TODO: Remove
-
             # compute the loss for regression
 
             if positive_indices.sum() > 0:
@@ -201,16 +187,14 @@ class FocalLoss(nn.Module):
                     regression_diff - 0.5 / 9.0
                 )
                 regression_losses.append(regression_loss.mean())
-                #regression_losses.append(torch.tensor(0, dtype=float))
             else:
                 if torch.cuda.is_available():
                     regression_losses.append(torch.tensor(0).float().cuda())
                 else:
                     regression_losses.append(torch.tensor(0).float())
         
-        del regressions, classifications, annotations, IoU
-        gc.collect()
+        #del regressions, classifications, annotations, IoU
+        #gc.collect()
 
         return torch.stack(classification_losses).mean(dim=0, keepdim=True), torch.stack(regression_losses).mean(dim=0, keepdim=True)
-
 
