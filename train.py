@@ -1,5 +1,6 @@
 import argparse
 import collections
+import gc
 
 import numpy as np
 
@@ -18,8 +19,6 @@ from data_processing.dataloader import CocoDataset, CSVDataset, collater, Resize
     Normalizer
 from torch.utils.data import DataLoader
 
-from model import coco_eval
-from model import csv_eval
 from model import nus_eval
 
 assert torch.__version__.split('.')[0] == '1'
@@ -91,6 +90,8 @@ def main(args=None):
             #Data format data[0] = 5 Channel last image, data[1][0] = Regression annot, data[1][1] = classification annot.
             if not parser.radar: # Crop and keep only image channels 
                 img = data[0][:,:,:,:3]
+            else:
+                img = data[0]
             img = torch.permute(torch.tensor(img).cuda().float(), (0,3,1,2))
             ann = train_generator.load_annotations(iter_num)
             if (len(ann['labels']) == 0):
@@ -121,24 +122,26 @@ def main(args=None):
             epoch_loss.append(float(loss))
 
             print(
-                    'Epoch: {} | Iteration: {} | Classification loss: {:1.5f} | Regression loss: {:1.5f} | Running loss: {:1.5f} | Elapsed Time: {}'.format(epoch_num, iter_num, float(classification_loss), float(regression_loss), np.mean(loss_hist), int(time.time()-start_time)), end='\r')
+                    'Ep: {} | Iter: {} | Cls loss: {:1.5f} | Reg loss: {:1.5f} | Running loss: {:1.5f} | Elp Time: {}'.format(epoch_num, iter_num, float(classification_loss), float(regression_loss), np.mean(loss_hist), int(time.time()-start_time)), end='\r')
 
             #except Exception as e:
             #    print(e)
             #    continue
-        torch.save(retinanet.module.state_dict(), 'vgg_retinanet_{}.pt'.format(epoch_num))
-        try:
-            mAP = nus_eval.evaluate(validation_generator, retinanet)
-        except Exception as e:
-            print(e)
-            continue
+            del classification_loss, regression_loss
+            gc.collect()
+        torch.save(retinanet.module.state_dict(), 'exp_radar_image_retinanet_{}.pt'.format(epoch_num))
+        #try:
+        #    mAP = nus_eval.evaluate(train_generator, retinanet)
+        #except Exception as e:
+        #    print(e)
+        #    continue
 
         scheduler.step(np.mean(epoch_loss))
 
 
     retinanet.eval()
 
-    torch.save(retinanet, 'model_final.pt')
+    torch.save(retinanet, 'exp_radar_image_model_final.pt')
 
 
 if __name__ == '__main__':
