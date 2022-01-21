@@ -10,6 +10,8 @@ import torch
 import torch.optim as optim
 from torchvision import transforms
 
+from torch.profiler import profile, record_function, ProfilerActivity
+
 from data_processing.generator.crf_main_generator import create_generators
 from utils.config import get_config
 
@@ -30,6 +32,7 @@ def main(args=None):
 
     parser.add_argument('--epochs', help='Number of epochs', type=int, default=100)
     parser.add_argument('--radar', help='Use radar modality?', type=bool, default=False)
+    parser.add_argument('--load_path', help='Load model path', type=str, default=None)
 
     parser = parser.parse_args(args)
 
@@ -39,6 +42,8 @@ def main(args=None):
 
     cfg = get_config('./config/default.cfg')
     train_generator, validation_generator, test_generator, test_night_generator, test_rain_generator = create_generators(cfg, backbone)
+    dataloader = DataLoader(train_generator, batch_size=cfg.batchsize, num_workers=10)
+    batch_size = cfg.batchsize
     print('=='*45)
     print('Length of train set: {}, val set: {}, test set: {}, test_night set: {}, test_rain set: {}'.format(len(train_generator), len(validation_generator), len(test_generator), len(test_night_generator), len(test_rain_generator)))
     print('=='*45)
@@ -51,6 +56,12 @@ def main(args=None):
     else:
         f_size = 256
     retinanet = Retinanet(backbone, num_anchors=9, num_classes=train_generator.num_classes(), feature_size=f_size, image_size=image_size)
+
+    if parser.load_path is not None:
+        retinanet.load_state_dict(torch.load(parser.load_path, map_location='cuda:0'))
+        start_ep = 7
+    else:
+        start_ep = 0
     
     use_gpu = True
 
@@ -76,23 +87,37 @@ def main(args=None):
 
     print('===='*7 + '\nNum training images: {}\n'.format(len(train_generator)) + '===='*10)
     start_time = time.time()
-    for epoch_num in range(parser.epochs):
+    
+    for epoch_num in range(start_ep, parser.epochs):
 
         retinanet.train()
         #retinanet.module.freeze_bn()
 
         epoch_loss = []
 
-        for iter_num, data in enumerate(train_generator):
+        #for iter_num, data in enumerate(train_generator):
+        for iter_num, data in enumerate(dataloader):#range(len(train_generator)):
             #try:
+            #with profile(activities=[
+            #            ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
+            #    with record_function("model_inference"):
+                    
             optimizer.zero_grad()
             #print('Data shape: {}, Annotation shape: {}'.format(data[0].shape, data[1][0].shape))
             #Data format data[0] = 5 Channel last image, data[1][0] = Regression annot, data[1][1] = classification annot.
+            #data = train_generator[iter_num]
+            #print(data[0].shape)
+            #print(len(data[1]))
+            #print(data[1][0].shape)
+            #print(data[1][1].shape)
+
             if not parser.radar: # Crop and keep only image channels 
-                img = data[0][:,:,:,:3]
+                img = data[0][0,:,:,:,:3]
             else:
-                img = data[0]
-            img = torch.permute(torch.tensor(img).cuda().float(), (0,3,1,2))
+                img = data[0][0,:,:,:,:]
+            img = torch.permute(img.cuda().float(), (0,3,1,2))
+            targets = get_annotations_for_batch(train_generator, iter_num, batch_size)
+            '''
             ann = train_generator.load_annotations(iter_num)
             if (len(ann['labels']) == 0):
                 targets = torch.tensor([[[-1, -1, -1, -1, -1]]]).cuda()
@@ -100,6 +125,7 @@ def main(args=None):
                 #print(ann['bboxes'].shape, ann['labels'].shape)
                 targets = np.hstack((ann['bboxes'], np.expand_dims(ann['labels'], axis=1))) 
                 targets = torch.tensor(np.expand_dims(targets, axis=0)).cuda()
+            '''
 
             classification_loss, regression_loss = retinanet([img, targets])
                 
@@ -128,8 +154,8 @@ def main(args=None):
             #    print(e)
             #    continue
             del classification_loss, regression_loss
-            gc.collect()
-        torch.save(retinanet.module.state_dict(), 'exp_radar_image_retinanet_{}.pt'.format(epoch_num))
+            #print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
+        torch.save(retinanet.module.state_dict(), 'exp2_radar_image_retinanet_{}.pt'.format(epoch_num))
         #try:
         #    mAP = nus_eval.evaluate(train_generator, retinanet)
         #except Exception as e:
@@ -141,8 +167,21 @@ def main(args=None):
 
     retinanet.eval()
 
-    torch.save(retinanet, 'exp_radar_image_model_final.pt')
+    torch.save(retinanet, 'exp2_radar_image_model_final.pt')
 
+def get_annotations_for_batch(generator, iter_num, batch_size):
+    bstart = iter_num*batch_size
+    btargets = []
+    for i in range(batch_size):
+        ann = generator.load_annotations(bstart+i)
+        if (len(ann['labels']) == 0):
+            btargets.append(torch.tensor([[-1., -1., -1., -1., -1.]]).cuda())
+        else:
+            #print(ann['bboxes'].shape, ann['labels'].shape)
+            targets = np.hstack((ann['bboxes'], np.expand_dims(ann['labels'], axis=1))) 
+            btargets.append(torch.tensor(targets).cuda())
+            #targets = torch.tensor(np.expand_dims(targets, axis=0)).cuda()
+    return btargets
 
 if __name__ == '__main__':
     main()

@@ -125,7 +125,7 @@ def main():
             print('Epoch: {} | Iteration: {} | Classification Loss: {:1.5f} | Regression Loss: {:1.5f} | Running Loss: {:1.5f}'.format(epoch, i, float(clas_loss), float(reg_loss), np.mean(loss_hist)))
 
             del img, targets, clas_loss, reg_loss, loss, targets_reg
-            gc.collect()
+            #gc.collect()
 
             #except Exception as e:
             #    print(e)

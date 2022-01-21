@@ -61,7 +61,8 @@ class FocalLoss(nn.Module):
             regression = regressions[j, :, :]
             #print(annotations.shape, regression.shape, anchors.shape)
 
-            bbox_annotation = annotations[j, :, :]
+            #bbox_annotation = torch.tensor(annotations[j, :, :]).cuda()
+            bbox_annotation = annotations[j]
             bbox_annotation = bbox_annotation[bbox_annotation[:, -1] != -1] # Keep all rows except the ones where the state of anchor is ignore. Anchor states = (ignore, negative, positive) (-1, 0, 1)
             #print(annotations[:,:,4].shape)
             #regression = regression[annotations[:, :, -1] != -1]
