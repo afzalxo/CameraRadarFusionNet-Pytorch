@@ -1,8 +1,10 @@
 import torch
 import torch.nn as nn
+import torch.utils.model_zoo as model_zoo
 from torchvision import transforms
 from torchvision.transforms import InterpolationMode
 from torchvision.ops import nms
+import torchvision.models as torchmodels
 from model.architecture.vgg import Vggmax
 #from model import losses_torch
 from model import losses
@@ -10,7 +12,7 @@ from model.anchors import Anchors
 from utils.bbox_utils import BBoxTransform, ClipBoxes
 
 class Retinanet(nn.Module):
-    def __init__(self, backbone, num_anchors, num_classes, num_values_regression=4, feature_size=254, image_size=(360, 640)):
+    def __init__(self, backbone, pretrained, num_anchors, num_classes, num_values_regression=4, feature_size=254, image_size=(360, 640)):
         super(Retinanet, self).__init__()
         self.feature_size = feature_size
         self.num_values_regression = num_values_regression
@@ -20,7 +22,9 @@ class Retinanet(nn.Module):
         self.classification_feature_size = 256
         self.num_classes = num_classes
 
-        self.backbone = backbone
+        self.backbone = backbone#torchmodels.vgg16()#backbone
+        #if pretrained:
+        #    self.backbone.load_state_dict(model_zoo.load_url('https://download.pytorch.org/models/vgg16-397923af.pth', model_dir='.'), strict=True)
         __feature_size = self.backbone._feature_sizes()
         self.p5_conv1 = nn.Conv2d(in_channels=__feature_size[-1], out_channels=self.feature_size, kernel_size=1, stride=1, padding=0)
         self.p5_conv2 = nn.Conv2d(in_channels=self.feature_size, out_channels=self.feature_size, kernel_size=3, stride=1, padding=1)

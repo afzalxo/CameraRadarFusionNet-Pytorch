@@ -48,6 +48,8 @@ def main(args=None):
     print('Length of train set: {}, val set: {}, test set: {}, test_night set: {}, test_rain set: {}'.format(len(train_generator), len(validation_generator), len(test_generator), len(test_night_generator), len(test_rain_generator)))
     print('=='*45)
     #####
+    #print(train_generator[0][0][:,:,:,0])
+    #exit(0)
 
     # Create the model
     image_size = (360, 640)
@@ -55,11 +57,11 @@ def main(args=None):
         f_size = 254
     else:
         f_size = 256
-    retinanet = Retinanet(backbone, num_anchors=9, num_classes=train_generator.num_classes(), feature_size=f_size, image_size=image_size)
+    retinanet = Retinanet(backbone, pretrained=True, num_anchors=9, num_classes=train_generator.num_classes(), feature_size=f_size, image_size=image_size)
 
     if parser.load_path is not None:
         retinanet.load_state_dict(torch.load(parser.load_path, map_location='cuda:0'))
-        start_ep = 7
+        start_ep = 20
     else:
         start_ep = 0
     
@@ -117,6 +119,17 @@ def main(args=None):
                 img = data[0][0,:,:,:,:]
             img = torch.permute(img.cuda().float(), (0,3,1,2))
             targets = get_annotations_for_batch(train_generator, iter_num, batch_size)
+            #print('==='*10)
+            #print(img[0,0,:,:])
+            #print(torch.max(img[0,0,:,:]))
+            #print('==='*10)
+            #print(img[0,3,:,:])
+            #print(torch.max(img[0,3,:,:]))
+            #print('==='*10)
+            #print(targets[0][:,:])
+            #print(torch.max(targets[0][:,:]))
+            #print('==='*10)
+            #exit(0)
             '''
             ann = train_generator.load_annotations(iter_num)
             if (len(ann['labels']) == 0):
@@ -155,7 +168,7 @@ def main(args=None):
             #    continue
             del classification_loss, regression_loss
             #print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
-        torch.save(retinanet.module.state_dict(), 'exp2_radar_image_retinanet_{}.pt'.format(epoch_num))
+        torch.save(retinanet.module.state_dict(), 'exp4_radar_image_retinanet_{}.pt'.format(epoch_num))
         #try:
         #    mAP = nus_eval.evaluate(train_generator, retinanet)
         #except Exception as e:

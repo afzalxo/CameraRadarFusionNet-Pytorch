@@ -78,15 +78,17 @@ def _get_detections(dataset, retinanet, score_threshold=0.05, max_detections=100
     all_detections = [[None for i in range(dataset.num_classes())] for j in range(len(dataset))]
 
     retinanet.eval()
-    
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, num_workers=4)    
     with torch.no_grad():
 
-        for index in range(len(dataset)):
-            data, _ = dataset[index]
+        #for index in range(len(dataset)):
+        for index, data in enumerate(dataloader):
+            #data, _ = dataset[index]
+            data = data[0][0]
             if not retinanet.module.backbone.radar:
-                data = torch.tensor(data[:,:,:,:3]).cuda().float()
+                data = data[:,:,:,:3].cuda()#.float()
             else:
-                data = torch.tensor(data).cuda().float()
+                data = data.cuda()#.float()
             data = torch.permute(data, (0,3,1,2))
 
             # run network

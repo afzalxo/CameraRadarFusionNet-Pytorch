@@ -77,7 +77,7 @@ class Vggmax(nn.Module):
         return [self.b2_in_ch, self.b3_in_ch, self.b4_in_ch, self.b5_in_ch, self.b5_in_ch]
 
     def preprocess_image(self, inputs):
-        return preprocess_image(inputs, mode='caffe')
+        return preprocess_image(inputs, mode='tf')#mode='caffe')
 
     def forward(self, input):
         concat_out = []

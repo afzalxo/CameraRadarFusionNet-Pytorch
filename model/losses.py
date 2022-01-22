@@ -3,12 +3,6 @@ import gc
 import torch
 import torch.nn as nn
 
-def getfree(sr):
-    r = torch.cuda.memory_reserved(0)
-    a = torch.cuda.memory_allocated(0)
-    f = (r-a)/(1024**2)  # free inside reserved
-    print((sr + ' free: {}').format(f))
-
 def calc_iou(a, b):
     area = (b[:, 2] - b[:, 0]) * (b[:, 3] - b[:, 1])
 
@@ -63,7 +57,7 @@ class FocalLoss(nn.Module):
 
             #bbox_annotation = torch.tensor(annotations[j, :, :]).cuda()
             bbox_annotation = annotations[j]
-            bbox_annotation = bbox_annotation[bbox_annotation[:, -1] != -1] # Keep all rows except the ones where the state of anchor is ignore. Anchor states = (ignore, negative, positive) (-1, 0, 1)
+            bbox_annotation = bbox_annotation[bbox_annotation[:, 4] != -1] # Keep all rows except the ones where the state of anchor is ignore. Anchor states = (ignore, negative, positive) (-1, 0, 1)
             #print(annotations[:,:,4].shape)
             #regression = regression[annotations[:, :, -1] != -1]
             #classification = classification[annotations[:, :, -1] != -1]

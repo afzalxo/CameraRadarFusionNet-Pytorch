@@ -26,6 +26,7 @@ def main(args=None):
     backbone = Vggmax(radar=parser.radar)
     cfg = get_config('./config/default.cfg')
     train_generator, validation_generator, test_generator, test_night_generator, test_rain_generator = create_generators(cfg, backbone)
+    
 
     # Create the model
     image_size = (360, 640)
@@ -33,7 +34,7 @@ def main(args=None):
         fsize = 254
     else:
         fsize = 256
-    retinanet = Retinanet(backbone, num_anchors=9, num_classes=validation_generator.num_classes(), feature_size=fsize, image_size=image_size)
+    retinanet = Retinanet(backbone, pretrained=False, num_anchors=9, num_classes=validation_generator.num_classes(), feature_size=fsize, image_size=image_size)
 
     use_gpu = True
 
